@@ -24,6 +24,9 @@ export default class CustomerB2C extends Model {
     @field('village') village?: string
     @field('city') city?: string
 
+    @field('registered_by') registeredBy?: string
+    @field('team') team?: string
+
     @readonly @date('created_at') createdAt!: Date
     @readonly @date('updated_at') updatedAt!: Date
 }

@@ -91,5 +91,24 @@ export default schemaMigrations({
                 }),
             ],
         },
+        {
+            toVersion: 5,
+            steps: [
+                addColumns({
+                    table: 'customers_b2b',
+                    columns: [
+                        { name: 'registered_by', type: 'string', isOptional: true },
+                        { name: 'team', type: 'string', isOptional: true },
+                    ],
+                }),
+                addColumns({
+                    table: 'customers_b2c',
+                    columns: [
+                        { name: 'registered_by', type: 'string', isOptional: true },
+                        { name: 'team', type: 'string', isOptional: true },
+                    ],
+                }),
+            ],
+        },
     ],
 })

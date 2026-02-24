@@ -20,6 +20,9 @@ export default class CustomerB2B extends Model {
     @field('tehsil') tehsil?: string
     @field('village') village?: string
 
+    @field('registered_by') registeredBy?: string
+    @field('team') team?: string
+
     @readonly @date('created_at') createdAt!: Date
     @readonly @date('updated_at') updatedAt!: Date
 }

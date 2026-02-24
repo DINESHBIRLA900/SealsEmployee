@@ -1,8 +1,21 @@
 import database from '../database';
 import { Q } from '@nozbe/watermelondb';
+import * as SecureStore from 'expo-secure-store';
 
 export const createCustomer = async (data: any) => {
     try {
+        // Get logged-in user info for registered_by
+        let userId = '';
+        let userTeam = '';
+        try {
+            const userStr = await SecureStore.getItemAsync('user');
+            if (userStr) {
+                const user = JSON.parse(userStr);
+                userId = user._id || '';
+                userTeam = user.team || '';
+            }
+        } catch (e) { }
+
         const type = data.customer_type === 'B2B' ? 'customers_b2b' : 'customers_b2c';
         const collection = database.get(type);
 
@@ -17,6 +30,8 @@ export const createCustomer = async (data: any) => {
                 customer.district = data.district;
                 customer.tehsil = data.tehsil;
                 customer.village = data.village;
+                customer.registeredBy = userId;
+                customer.team = userTeam;
 
                 if (type === 'customers_b2b') {
                     customer.companyName = data.company_name;

@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronLeft, ChevronRight, CheckCircle, Clock, AlertCircle } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, CheckCircle, Clock, AlertCircle, MapPin } from 'lucide-react-native';
 import HeaderCard from '../components/HeaderCard';
+import * as SecureStore from 'expo-secure-store';
+import { checkIn, checkOut, getUserAttendance } from '../src/services/attendanceService';
+import * as Location from 'expo-location';
 
 const { width } = Dimensions.get('window');
 
@@ -13,8 +16,117 @@ export default function AttendanceScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const [currentDate, setCurrentDate] = useState(new Date());
+    const [attendanceLogs, setAttendanceLogs] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [processing, setProcessing] = useState(false);
+    const [todayLog, setTodayLog] = useState<any>(null);
 
+    useEffect(() => {
+        fetchAttendance();
+    }, []);
 
+    const fetchAttendance = async () => {
+        setLoading(true);
+        try {
+            const userStr = await SecureStore.getItemAsync('user');
+            if (!userStr) return;
+            const user = JSON.parse(userStr);
+            const data = await getUserAttendance(user.id || user._id);
+            setAttendanceLogs(data);
+
+            // Find today's log
+            const today = new Date().toDateString();
+            const log = data.find((l: any) => new Date(l.date).toDateString() === today);
+            setTodayLog(log);
+        } catch (error) {
+            console.error("Failed to fetch attendance", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleCheckIn = async () => {
+        setProcessing(true);
+        try {
+            let { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Permission Denied', 'Location permission is required for attendance.');
+                setProcessing(false);
+                return;
+            }
+
+            let location = await Location.getCurrentPositionAsync({});
+            let address = "Unknown Location";
+
+            try {
+                const reverseGeocode = await Location.reverseGeocodeAsync({
+                    latitude: location.coords.latitude,
+                    longitude: location.coords.longitude
+                });
+                if (reverseGeocode.length > 0) {
+                    const item = reverseGeocode[0];
+                    address = `${item.name || ''} ${item.city || ''} ${item.region || ''}`.trim();
+                }
+            } catch (err) {
+                console.log("Geocoding failed", err);
+            }
+
+            const userStr = await SecureStore.getItemAsync('user');
+            const user = userStr ? JSON.parse(userStr) : null;
+
+            await checkIn({
+                user_id: user?.id || user?._id,
+                latitude: location.coords.latitude,
+                longitude: location.coords.longitude,
+                address
+            });
+
+            Alert.alert('Success', 'Check-in successful!');
+            fetchAttendance();
+        } catch (error: any) {
+            Alert.alert('Error', error.response?.data?.message || 'Failed to check-in');
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const handleCheckOut = async () => {
+        setProcessing(true);
+        try {
+            let location = await Location.getCurrentPositionAsync({});
+            let address = "Unknown Location";
+
+            try {
+                const reverseGeocode = await Location.reverseGeocodeAsync({
+                    latitude: location.coords.latitude,
+                    longitude: location.coords.longitude
+                });
+                if (reverseGeocode.length > 0) {
+                    const item = reverseGeocode[0];
+                    address = `${item.name || ''} ${item.city || ''} ${item.region || ''}`.trim();
+                }
+            } catch (err) {
+                console.log("Geocoding failed", err);
+            }
+
+            const userStr = await SecureStore.getItemAsync('user');
+            const user = userStr ? JSON.parse(userStr) : null;
+
+            await checkOut({
+                user_id: user?.id || user?._id,
+                latitude: location.coords.latitude,
+                longitude: location.coords.longitude,
+                address
+            });
+
+            Alert.alert('Success', 'Check-out successful!');
+            fetchAttendance();
+        } catch (error: any) {
+            Alert.alert('Error', error.response?.data?.message || 'Failed to check-out');
+        } finally {
+            setProcessing(false);
+        }
+    };
 
     const changeMonth = (increment: number) => {
         const newDate = new Date(currentDate);
@@ -53,12 +165,14 @@ export default function AttendanceScreen() {
                 month === new Date().getMonth() &&
                 year === new Date().getFullYear();
 
+            const cellDate = new Date(year, month, i).toDateString();
+            const log = attendanceLogs.find(l => new Date(l.date).toDateString() === cellDate);
+
             days.push(
                 <TouchableOpacity key={`curr-${i}`} style={[styles.dayCell, isToday && styles.todayCell]}>
                     <Text style={[styles.dayText, isToday && styles.todayText]}>{i}</Text>
-                    {/* Placeholder dot for attendance example */}
-                    {i < new Date().getDate() && month === new Date().getMonth() && (
-                        <View style={[styles.dot, { backgroundColor: i % 7 === 0 ? '#ef4444' : '#10b981' }]} />
+                    {log && (
+                        <View style={[styles.dot, { backgroundColor: log.status === 'Present' ? '#10b981' : '#f59e0b' }]} />
                     )}
                 </TouchableOpacity>
             );
@@ -78,9 +192,9 @@ export default function AttendanceScreen() {
     };
 
     const actionButtons = [
-        { title: 'Work Approval', icon: <CheckCircle size={24} color="#fff" />, color: '#3b82f6', path: '/attendance/work-approval' },
-        { title: 'Leave Request', icon: <Clock size={24} color="#fff" />, color: '#f59e0b', path: null },
-        { title: 'Holiday List', icon: <AlertCircle size={24} color="#fff" />, color: '#10b981', path: null },
+        { title: 'Work Approval', icon: <CheckCircle size={20} color="#fff" />, color: '#3b82f6', path: '/attendance/work-approval' },
+        { title: 'Leave Request', icon: <Clock size={20} color="#fff" />, color: '#f59e0b', path: '/apply-leave' },
+        { title: 'Holiday List', icon: <AlertCircle size={20} color="#fff" />, color: '#10b981', path: null },
     ];
 
     return (
@@ -88,7 +202,72 @@ export default function AttendanceScreen() {
             <HeaderCard />
 
             <ScrollView contentContainerStyle={styles.content}>
-                <Text style={styles.pageTitle}>Attendance</Text>
+                <View style={styles.topRow}>
+                    <Text style={styles.pageTitle}>Attendance</Text>
+                    {todayLog ? (
+                        <View style={[styles.statusBadge, { backgroundColor: todayLog.check_out ? '#10b981' : '#3b82f6' }]}>
+                            <Text style={styles.statusBadgeText}>{todayLog.check_out ? 'Finalized' : 'Checked In'}</Text>
+                        </View>
+                    ) : (
+                        <View style={[styles.statusBadge, { backgroundColor: '#ef4444' }]}>
+                            <Text style={styles.statusBadgeText}>Not Checked In</Text>
+                        </View>
+                    )}
+                </View>
+
+                {/* Check-in/Check-out Card */}
+                <View style={styles.attendanceActionCard}>
+                    {!todayLog ? (
+                        <TouchableOpacity
+                            style={styles.mainActionButton}
+                            onPress={handleCheckIn}
+                            disabled={processing}
+                        >
+                            {processing ? (
+                                <ActivityIndicator color="#fff" />
+                            ) : (
+                                <>
+                                    <View style={styles.iconCircle}>
+                                        <MapPin size={28} color="#fff" />
+                                    </View>
+                                    <View>
+                                        <Text style={styles.actionTitle}>Check In Now</Text>
+                                        <Text style={styles.actionSubtitle}>Start your workday</Text>
+                                    </View>
+                                </>
+                            )}
+                        </TouchableOpacity>
+                    ) : !todayLog.check_out ? (
+                        <TouchableOpacity
+                            style={[styles.mainActionButton, { backgroundColor: '#f97316' }]}
+                            onPress={handleCheckOut}
+                            disabled={processing}
+                        >
+                            {processing ? (
+                                <ActivityIndicator color="#fff" />
+                            ) : (
+                                <>
+                                    <View style={[styles.iconCircle, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+                                        <Clock size={28} color="#fff" />
+                                    </View>
+                                    <View>
+                                        <Text style={styles.actionTitle}>Check Out Now</Text>
+                                        <Text style={styles.actionSubtitle}>End your workday</Text>
+                                    </View>
+                                </>
+                            )}
+                        </TouchableOpacity>
+                    ) : (
+                        <View style={styles.finishedCard}>
+                            <CheckCircle size={32} color="#10b981" />
+                            <Text style={styles.finishedText}>Workday Finished</Text>
+                            <Text style={styles.durationText}>
+                                Duration: {Math.floor((todayLog.work_duration || 0) / 60)}h {(todayLog.work_duration || 0) % 60}m
+                            </Text>
+                        </View>
+                    )}
+                </View>
+
                 {/* Calendar Card */}
                 <View style={styles.calendarCard}>
                     <View style={styles.monthHeader}>
@@ -110,11 +289,15 @@ export default function AttendanceScreen() {
                     </View>
 
                     <View style={styles.daysGrid}>
-                        {renderCalendar()}
+                        {loading ? (
+                            <View style={{ width: '100%', paddingVertical: 40, alignItems: 'center' }}>
+                                <ActivityIndicator color="#3b82f6" />
+                            </View>
+                        ) : renderCalendar()}
                     </View>
                 </View>
 
-                {/* Action Buttons */}
+                {/* Sub-Action Buttons */}
                 <View style={styles.actionsContainer}>
                     {actionButtons.map((btn, index) => (
                         <TouchableOpacity
@@ -138,46 +321,127 @@ export default function AttendanceScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f3f4f6',
+        backgroundColor: '#f8fafc',
     },
     content: {
         padding: 16,
     },
+    topRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    pageTitle: {
+        fontSize: 24,
+        fontWeight: '900',
+        color: '#0f172a',
+    },
+    statusBadge: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+    },
+    statusBadgeText: {
+        color: '#fff',
+        fontSize: 10,
+        fontWeight: '900',
+        textTransform: 'uppercase',
+    },
+    attendanceActionCard: {
+        marginBottom: 24,
+    },
+    mainActionButton: {
+        backgroundColor: '#3b82f6',
+        borderRadius: 20,
+        padding: 24,
+        flexDirection: 'row',
+        alignItems: 'center',
+        shadowColor: '#3b82f6',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 8,
+    },
+    iconCircle: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 20,
+    },
+    actionTitle: {
+        fontSize: 20,
+        fontWeight: '900',
+        color: '#fff',
+    },
+    actionSubtitle: {
+        fontSize: 14,
+        color: 'rgba(255,255,255,0.8)',
+        fontWeight: '600',
+    },
+    finishedCard: {
+        backgroundColor: '#fff',
+        borderRadius: 20,
+        padding: 24,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#e2e8f0',
+    },
+    finishedText: {
+        fontSize: 18,
+        fontWeight: '900',
+        color: '#0f172a',
+        marginTop: 12,
+    },
+    durationText: {
+        fontSize: 14,
+        color: '#64748b',
+        fontWeight: '600',
+        marginTop: 4,
+    },
     calendarCard: {
         backgroundColor: '#fff',
-        borderRadius: 16,
-        padding: 16,
+        borderRadius: 20,
+        padding: 20,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
+        shadowRadius: 15,
+        elevation: 3,
         marginBottom: 24,
+        borderWidth: 1,
+        borderColor: '#f1f5f9',
     },
     monthHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 16,
+        marginBottom: 20,
     },
     monthTitle: {
         fontSize: 18,
-        fontWeight: 'bold',
-        color: '#1f2937',
+        fontWeight: '900',
+        color: '#0f172a',
     },
     navButton: {
         padding: 8,
+        backgroundColor: '#f1f5f9',
+        borderRadius: 12,
     },
     weekRow: {
         flexDirection: 'row',
-        marginBottom: 8,
+        marginBottom: 12,
     },
     weekDayText: {
         flex: 1,
         textAlign: 'center',
         fontSize: 12,
-        color: '#9ca3af',
-        fontWeight: '600',
+        color: '#94a3b8',
+        fontWeight: '800',
+        textTransform: 'uppercase',
     },
     daysGrid: {
         flexDirection: 'row',
@@ -185,63 +449,66 @@ const styles = StyleSheet.create({
     },
     dayCell: {
         width: '14.28%',
-        height: 40,
+        height: 44,
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 4,
     },
     todayCell: {
-        backgroundColor: '#3b82f6',
-        borderRadius: 20,
+        backgroundColor: '#eff6ff',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#3b82f6',
     },
     dayText: {
-        fontSize: 14,
-        color: '#374151',
+        fontSize: 15,
+        color: '#334155',
+        fontWeight: '600',
     },
     todayText: {
-        color: '#fff',
-        fontWeight: 'bold',
+        color: '#3b82f6',
+        fontWeight: '900',
     },
     dot: {
-        width: 4,
-        height: 4,
-        borderRadius: 2,
+        width: 5,
+        height: 5,
+        borderRadius: 3,
         marginTop: 2,
     },
     actionsContainer: {
-        gap: 16,
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+        marginBottom: 40,
     },
     actionButton: {
-        flexDirection: 'row',
+        flex: 1,
+        minWidth: '45%',
+        paddingVertical: 16,
+        paddingHorizontal: 12,
+        borderRadius: 16,
         alignItems: 'center',
-        padding: 16,
-        borderRadius: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
+        justifyContent: 'center',
     },
     actionIcon: {
-        marginRight: 16,
+        marginBottom: 8,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        padding: 8,
+        borderRadius: 12,
     },
     actionText: {
-        fontSize: 16,
-        fontWeight: 'bold',
+        fontSize: 11,
+        fontWeight: '900',
         color: '#fff',
+        textAlign: 'center',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     otherMonthCell: {
-        opacity: 0.5,
+        opacity: 0.2,
     },
     otherMonthText: {
         fontSize: 14,
-        color: '#d1d5db',
-    },
-    pageTitle: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#1f2937',
-        marginBottom: 16,
-        paddingHorizontal: 4,
+        color: '#94a3b8',
     },
 });

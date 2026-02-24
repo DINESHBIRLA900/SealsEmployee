@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb'
 
 export default appSchema({
-    version: 4,
+    version: 5,
     tables: [
         tableSchema({
             name: 'users',
@@ -71,6 +71,8 @@ export default appSchema({
                 { name: 'district', type: 'string', isOptional: true },
                 { name: 'tehsil', type: 'string', isOptional: true },
                 { name: 'village', type: 'string', isOptional: true },
+                { name: 'registered_by', type: 'string', isOptional: true },
+                { name: 'team', type: 'string', isOptional: true },
 
                 { name: 'created_at', type: 'number' },
                 { name: 'updated_at', type: 'number' },
@@ -98,6 +100,8 @@ export default appSchema({
                 { name: 'tehsil', type: 'string', isOptional: true },
                 { name: 'village', type: 'string', isOptional: true },
                 { name: 'city', type: 'string', isOptional: true },
+                { name: 'registered_by', type: 'string', isOptional: true },
+                { name: 'team', type: 'string', isOptional: true },
 
                 { name: 'created_at', type: 'number' },
                 { name: 'updated_at', type: 'number' },

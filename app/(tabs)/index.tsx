@@ -1,24 +1,63 @@
-import { StyleSheet, View, Text, ScrollView } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, ActivityIndicator } from 'react-native';
 import HeaderCard from '../../components/HeaderCard';
 import ImageSlider from '../../components/ImageSlider';
+import CategoryGrid from '../../components/CategoryGrid';
+import React, { useEffect, useState } from 'react';
+import { advertisementService } from '../../src/services/advertisementService';
 
 export default function HomeScreen() {
-  // Sample images for the slider
-  const sliderImages = [
-    'https://images.unsplash.com/photo-1557821552-17105176677c?w=800&h=400&fit=crop',
-    'https://images.unsplash.com/photo-1556155092-490a1ba16284?w=800&h=400&fit=crop',
-    'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=800&h=400&fit=crop',
-    'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&h=400&fit=crop',
-  ];
+  const [sliderImages, setSliderImages] = useState<string[]>([]);
+  const [middleSliderImages, setMiddleSliderImages] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadSliderImages();
+  }, []);
+
+  const loadSliderImages = async () => {
+    try {
+      const [homeCards, middleCards] = await Promise.all([
+        advertisementService.getHomeCards(),
+        advertisementService.getMiddleCards()
+      ]);
+
+      setSliderImages(homeCards.map(card => card.image));
+      setMiddleSliderImages(middleCards.map(card => card.image));
+    } catch (error) {
+      console.error('Failed to load slider images', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
       <HeaderCard />
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Image Slider */}
+        {/* Top Image Slider */}
         <View style={styles.sliderSection}>
-          <ImageSlider images={sliderImages} height={200} autoRotateInterval={4000} />
+          {loading ? (
+            <View style={{ height: 200, justifyContent: 'center', alignItems: 'center' }}>
+              <ActivityIndicator size="large" color="#10b981" />
+            </View>
+          ) : sliderImages.length > 0 ? (
+            <ImageSlider images={sliderImages} height={200} autoRotateInterval={4000} />
+          ) : (
+            <View style={{ height: 200, backgroundColor: '#e5e7eb', borderRadius: 12, justifyContent: 'center', alignItems: 'center' }}>
+              <Text style={{ color: '#9ca3af' }}>No advertisements available</Text>
+            </View>
+          )}
         </View>
+
+        {/* Product Categories */}
+        <CategoryGrid />
+
+        {/* Middle Image Slider */}
+        {middleSliderImages.length > 0 && (
+          <View style={styles.sliderSection}>
+            <ImageSlider images={middleSliderImages} height={180} autoRotateInterval={4000} />
+          </View>
+        )}
 
         {/* Welcome Content */}
         <View style={styles.content}>

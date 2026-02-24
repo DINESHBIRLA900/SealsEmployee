@@ -13,16 +13,19 @@ const getBaseUrl = () => {
 
     if (debuggerHost) {
         const ip = debuggerHost.split(':')[0];
-        return `http://${ip}:5001/api`;
+        return `http://${ip}:5002/api`;
     }
 
     // Fallback for simulators/web or if detection fails
     // You can update this fallback if your IP changes and you are not using Expo Go with host forwarding
-    return 'http://10.22.199.241:5001/api';
+    return 'http://10.22.199.241:5002/api';
 };
 
 const API_URL = getBaseUrl();
+const BASE_URL = API_URL.replace('/api', '');
 console.log('API Service initialized with URL:', API_URL);
+
+export { API_URL, BASE_URL };
 
 const api = axios.create({
     baseURL: API_URL,
