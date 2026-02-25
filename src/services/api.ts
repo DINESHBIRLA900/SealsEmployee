@@ -6,19 +6,22 @@ import { Platform } from 'react-native';
 // Replace this with your computer's local IP address
 import Constants from 'expo-constants';
 
-// Dynamic IP detection
-const getBaseUrl = () => {
-    // Try to get IP from Expo Go host
-    const debuggerHost = Constants.expoConfig?.hostUri;
+// Live Backend URL
+const LIVE_URL = 'https://samridhi-backend-1ay3.onrender.com/api';
 
-    if (debuggerHost) {
-        const ip = debuggerHost.split(':')[0];
-        return `http://${ip}:5002/api`;
+// Dynamic IP detection (for local development)
+const getBaseUrl = () => {
+    // If we are in development and not on a real device, we might want local IP
+    // But for APK build, we want the LIVE_URL
+    if (__DEV__) {
+        const debuggerHost = Constants.expoConfig?.hostUri;
+        if (debuggerHost) {
+            const ip = debuggerHost.split(':')[0];
+            return `http://${ip}:5002/api`;
+        }
     }
 
-    // Fallback for simulators/web or if detection fails
-    // You can update this fallback if your IP changes and you are not using Expo Go with host forwarding
-    return 'http://192.168.1.18:5002/api';
+    return LIVE_URL;
 };
 
 const API_URL = getBaseUrl();
