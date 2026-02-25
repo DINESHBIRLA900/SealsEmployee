@@ -18,7 +18,7 @@ const getBaseUrl = () => {
 
     // Fallback for simulators/web or if detection fails
     // You can update this fallback if your IP changes and you are not using Expo Go with host forwarding
-    return 'http://10.22.199.241:5002/api';
+    return 'http://192.168.1.18:5002/api';
 };
 
 const API_URL = getBaseUrl();

@@ -1,5 +1,5 @@
 import api from './api';
-import { ProductCategory } from '../types/product';
+import { ProductCategory, Product } from '../types/product';
 
 export const productService = {
     getCategories: async (): Promise<ProductCategory[]> => {
@@ -8,6 +8,15 @@ export const productService = {
             return response.data;
         } catch (error) {
             console.error('Error fetching categories:', error);
+            throw error;
+        }
+    },
+    getProducts: async (): Promise<Product[]> => {
+        try {
+            const response = await api.get('/products/product-list');
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching products:', error);
             throw error;
         }
     }

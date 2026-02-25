@@ -2,6 +2,7 @@ import { StyleSheet, View, Text, ScrollView, ActivityIndicator } from 'react-nat
 import HeaderCard from '../../components/HeaderCard';
 import ImageSlider from '../../components/ImageSlider';
 import CategoryGrid from '../../components/CategoryGrid';
+import { ProductGrid } from '../../components/ProductGrid';
 import React, { useEffect, useState } from 'react';
 import { advertisementService } from '../../src/services/advertisementService';
 
@@ -59,11 +60,8 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Welcome Content */}
-        <View style={styles.content}>
-          <Text style={styles.title}>Home</Text>
-          <Text style={styles.text}>Welcome to CLT Mobile App.</Text>
-        </View>
+        {/* Featured Products */}
+        <ProductGrid />
       </ScrollView>
     </View>
   );

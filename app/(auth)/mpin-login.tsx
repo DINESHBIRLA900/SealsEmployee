@@ -96,12 +96,19 @@ export default function MpinLoginScreen() {
         } catch (error: any) {
             console.error(error);
             const message = error.response?.data?.message || 'Invalid mPIN';
-            Alert.alert('Error', message);
-            setMpin(['', '', '', '']); // Clear mPIN on error
-            inputs.current[0]?.focus(); // Reset focus
+
+            if (message.includes('not set')) {
+                Alert.alert('Setup Required', message);
+                router.replace('/(auth)/set-mpin');
+            } else {
+                Alert.alert('Error', message);
+                setMpin(['', '', '', '']); // Clear mPIN on error
+                inputs.current[0]?.focus(); // Reset focus
+            }
         } finally {
             setLoading(false);
         }
+
     };
 
     const handleLogout = () => {
